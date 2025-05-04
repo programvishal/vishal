@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>REPAIR POINT</title>
+  <style>
+    body {
+      background: #000;
+      color: cyan;
+      font-family: elephant, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      text-shadow: 0 0 10px cyan;
+    }
+    input, select, button {
+      padding: 8px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #0f0;
+      padding: 10px;
+      text-align: center;
+    }
+    button {
+      background: #0f0;
+      color: black;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>REPAIR POINT</h1>
+
+  <!-- Order Form -->
+  <div>
+    <input type="text" id="customerName" placeholder="Customer Name">
+    <input type="text" id="mobile" placeholder="Mobile No.">
+    <input type="text" id="product" placeholder="Product Name">
+    <input type="text" id="problem" placeholder="Problem">
+    <input type="number" id="total" placeholder="Total Amount">
+    <input type="number" id="advance" placeholder="Advance Amount">
+    <input type="date" id="deliveryDate">
+    <select id="status">
+      <option value="Pending">Pending</option>
+      <option value="In Progress">In Progress</option>
+      <option value="Completed">Completed</option>
+      <option value="Delivered">Delivered</option>
+      <option value="Home Visit">Home Visit</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+    <button id="submitBtn">Add Order</button>
+  </div>
+
+  <!-- Search -->
+  <div style="margin-top:10px;">
+    <input type="text" id="searchInput" placeholder="Search by Order ID or Mobile">
+    <button onclick="searchOrders()">Search</button>
+    <button onclick="displayOrders()">Reset</button>
+    <button onclick="downloadExcel()">📥 Download Excel</button>
+  </div>
+
+  <!-- Order Table -->
+  <table>
+    <thead>
+      <tr>
+        <th>ORD ID</th>
+        <th>Name</th>
+        <th>Mobile</th>
+        <th>Product</th>
+        <th>Problem</th>
+        <th>Total</th>
+        <th>Advance</th>
+        <th>Due</th>
+        <th>Received</th>
+        <th>Delivery</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="orderBody"></tbody>
+  </table>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script>
+    let orders = JSON.parse(localStorage.getItem("orders")) || [];
+
+    function getTodayDate() {
+      const today = new Date();
+      return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    }
+
+    function generateOrderId() {
+      return "RP" + String(orders.length + 1).padStart(4, '0');
+    }
+
+    function displayOrders(filtered = orders) {
+      const orderBody = document.getElementById("orderBody");
+      orderBody.innerHTML = "";
+
+      filtered.forEach((order, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${order.id}</td>
+          <td>${order.name}</td>
+          <td>${order.mobile}</td>
+          <td>${order.product}</td>
+          <td>${order.problem}</td>
+          <td>${order.total}</td>
+          <td>${order.advance}</td>
+          <td>${order.due}</td>
+          <td>${order.received}</td>
+          <td>${order.delivery}</td>
+          <td>
+            <select onchange="updateStatus(${index}, this.value)">
+              <option value="Pending" ${order.status === "Pending" ? "selected" : ""}>Pending</option>
+              <option value="In Progress" ${order.status === "In Progress" ? "selected" : ""}>In Progress</option>
+              <option value="Completed" ${order.status === "Completed" ? "selected" : ""}>Completed</option>
+              <option value="Delivered" ${order.status === "Delivered" ? "selected" : ""}>Delivered</option>
+              <option value="Home Visit" ${order.status === "Home Visit" ? "selected" : ""}>Home Visit</option>
+              <option value="Cancelled" ${order.status === "Cancelled" ? "selected" : ""}>Cancelled</option>
+            </select>
+          </td>
+          <td><button onclick="deleteOrder(${index})">🗑️</button></td>
+        `;
+        orderBody.appendChild(row);
+      });
+    }
+
+    function updateStatus(index, newStatus) {
+      orders[index].status = newStatus;
+      localStorage.setItem("orders", JSON.stringify(orders));
+      displayOrders();
+    }
+
+    function deleteOrder(index) {
+      if (confirm("Are you sure to delete this order?")) {
+        orders.splice(index, 1);
+        localStorage.setItem("orders", JSON.stringify(orders));
+        displayOrders();
+      }
+    }
+
+    document.getElementById("submitBtn").onclick = function () {
+      const name = document.getElementById("customerName").value;
+      const mobile = document.getElementById("mobile").value;
+      const product = document.getElementById("product").value;
+      const problem = document.getElementById("problem").value;
+      const total = parseFloat(document.getElementById("total").value) || 0;
+      const advance = parseFloat(document.getElementById("advance").value) || 0;
+      const delivery = document.getElementById("deliveryDate").value;
+      const status = document.getElementById("status").value;
+      const received = getTodayDate();
+      const due = total - advance;
+      const id = generateOrderId();
+
+      const order = { id, name, mobile, product, problem, total, advance, due, received, delivery, status };
+      orders.push(order);
+      localStorage.setItem("orders", JSON.stringify(orders));
+      displayOrders();
+
+      document.getElementById("customerName").value = "";
+      document.getElementById("mobile").value = "";
+      document.getElementById("product").value = "";
+      document.getElementById("problem").value = "";
+      document.getElementById("total").value = "";
+      document.getElementById("advance").value = "";
+      document.getElementById("deliveryDate").value = "";
+      document.getElementById("status").value = "Pending";
+    };
+
+    function searchOrders() {
+      const term = document.getElementById("searchInput").value.trim().toLowerCase();
+      const filtered = orders.filter(order =>
+        order.id.toLowerCase().includes(term) || order.mobile.includes(term)
+      );
+      displayOrders(filtered);
+    }
+
+    function downloadExcel() {
+      const data = orders.map(order => ({
+        "Order ID": order.id,
+        "Name": order.name,
+        "Mobile": order.mobile,
+        "Product": order.product,
+        "Problem": order.problem,
+        "Total": order.total,
+        "Advance": order.advance,
+        "Due": order.due,
+        "Received Date": order.received,
+        "Delivery Date": order.delivery,
+        "Status": order.status
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Repair Orders");
+      XLSX.writeFile(workbook, "repair_orders.xlsx");
+    }
+
+    window.onload = function () {
+      displayOrders();
+    };
+  </script>
+</body>
+</html>
